@@ -46,9 +46,21 @@ def dwt(x,wavelet="db4",multilevel=False):
     approx_coeffs = conv(x,lpf)
     if not multilevel:
         return tf.concat([approx_coeffs,detail_coeffs],axis=1)
-    levels = tf.cast(log2(x.shape[1]),tf.int32)
-    for l in range(1,levels+1):
-        pass
+    
+    outputs = tf.TensorArray(tf.float32,size=0, dynamic_size=True,infer_shape=False,element_shape=tf.TensorShape([None,None,None]))
+    outputs.write(0,tf.transpose(detail_coeffs,[1,2,0]))
+    idx = tf.constant(1)
+    while approx_coeffs.shape[1] > lpf.shape[0]:
+        detail_coeffs = conv(approx_coeffs,hpf)
+        approx_coeffs = conv(approx_coeffs,lpf)
+        outputs.write(idx,tf.transpose(detail_coeffs,[1,2,0]))
+        idx = tf.add(idx,1)
+    outputs.write(idx,tf.transpose(approx_coeffs,[1,2,0]))
+    coeffs = outputs.concat()
+    coeffs = tf.reverse(coeffs,[0])
+    coeffs = tf.transpose(coeffs,[2,0,1])
+    return coeffs
+    
 
 
 def idwt():
@@ -63,11 +75,28 @@ def idwt():
     pass
 
 
+def split_coeffs(coeffs,filter_length):
+    output = []
+    while len(coeffs) > filter_length:
+        output.append(coeffs[len(coeffs)//2:])
+        coeffs = coeffs[0:len(coeffs)//2]
+    output.append(coeffs)
+    output.reverse()
+    return output
+
 
 if __name__=='__main__':
     X,Y = signal([16,96],length=1024,overlap=True)
     yt = tf.reshape(tf.convert_to_tensor(Y,dtype=tf.float32),(1,Y.shape[0],1))
     pcoeffs = dwt(yt)
+    coeffs = split_coeffs(tf.reshape(pcoeffs,(1024)).numpy(),8)
+    for i in range(len(coeffs)-1):
+        coeffs[-i] = np.zeros_like(coeffs[-i])
+        y_r = pywt.waverec(coeffs,'db4',mode='periodization')
+        plt.plot(y_r)
+        plt.show()
+
+
     """
     y = tf.ones((1,1024,1))
     f = tf.convert_to_tensor([.5,.5,.5,.5])
