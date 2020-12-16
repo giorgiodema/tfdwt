@@ -1,6 +1,7 @@
 import tensorflow as tf
 from wavelet import *
 import pywt
+import matplotlib.pyplot as plt
 
 
 coefficients = {
@@ -19,11 +20,9 @@ coefficients = {
 
 def conv(x,filter):
     filter = tf.reshape(filter,(filter.shape[0],1,1,1))
-    #x = tf.transpose(x,[0,2,1])
     x = tf.reshape(x,(x.shape[0],x.shape[1],x.shape[2],1))
     o = tf.nn.conv2d(x,filter,(2,1),'SAME')
     o = tf.reshape(o,(o.shape[0],o.shape[1],o.shape[2]))
-    #o = tf.transpose(o,[0,2,1])
     return o
 
 
@@ -67,14 +66,28 @@ def idwt():
 
 if __name__=='__main__':
     X,Y = signal([16,96],length=1024,overlap=True)
+    yt = tf.reshape(tf.convert_to_tensor(Y,dtype=tf.float32),(1,Y.shape[0],1))
+    pcoeffs = dwt(yt)
     """
     y = tf.ones((1,1024,1))
     f = tf.convert_to_tensor([.5,.5,.5,.5])
     o = conv(y,f)
     pass
     """
-
+    """
     yt = tf.reshape(tf.convert_to_tensor(Y,dtype=tf.float32),(1,Y.shape[0],1))
+    plt.plot(Y)
+    plt.title("Original")
+    plt.show()
     pcoeffs = dwt(yt)
     tcoeffs = pywt.dwt(Y,'db4')
+
+    pcoeffs = tf.reshape(pcoeffs,(1024))
+    ac = pcoeffs[0:512].numpy()
+    dc = pcoeffs[512:].numpy()
+    yr = pywt.idwt(ac,dc,'db4')
+    plt.plot(yr)
+    plt.title("Reconstructed")
+    plt.show()
     pass
+    """
