@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.python.ops.gen_array_ops import transpose
 from wavelet import *
 import pywt
 import matplotlib.pyplot as plt
@@ -11,8 +12,9 @@ coefficients = {
             "hpf":tf.constant([-0.2303778133, 0.7148465706,-0.6308807679,-0.0279837694, 0.1870348117, 0.0308413818,-0.0328830117,-0.0105974018])
         },
         "rec":{
-            "lpf":tf.constant([0.2303778133,0.7148465706,0.6308807679,0.0279837694,0.1870348117,0.0308413818,0.0328830117,0.0105974018]),
-            "hpf":tf.constant([-0.0105974018,-0.0328830117, 0.0308413818, 0.1870348117,-0.0279837694,-0.6308807679, 0.7148465706,-0.2303778133])
+            "lpf":tf.constant([ 0.7148465706,0.0328830117, -0.0279837694,-0.1870348117,0.0308413818, 0.6308807679,-0.0105974018,0.2303778133]),
+            "hpf":tf.constant([-0.2303778133,-0.0105974018,-0.6308807679,0.0308413818,0.1870348117,-0.0279837694,-0.0328830117,0.7148465706])
+
         }
     }
 }
@@ -24,6 +26,13 @@ def conv(x,filter):
     o = tf.nn.conv2d(x,filter,(2,1),'SAME')
     o = tf.reshape(o,(o.shape[0],o.shape[1],o.shape[2]))
     return o
+
+def interleave(t1,t2):
+    tf.assert_equal(t1.shape,t2.shape)
+    even_pos = tf.convert_to_tensor(list(range(0,2*t1.shape[0],2)),dtype=tf.int32)
+    odd_pos = tf.convert_to_tensor(list(range(1,2*t1.shape[0],2)),dtype=tf.int32)
+    out = tf.dynamic_stitch([even_pos,odd_pos],[t1,t2])
+    return out
 
 
 def log2(x):
@@ -63,7 +72,7 @@ def dwt(x,wavelet="db4",multilevel=False):
     
 
 
-def idwt():
+def idwt(coeffs,wavelet="db4",multilevel=False):
     """
     Params:
         -> x: the coefficients of the dwt decomposition
@@ -72,7 +81,26 @@ def idwt():
                                 otherwise it computes the single level discrete wavelet transform
         -> mask:
     """
-    pass
+    lpf = coefficients[wavelet]["rec"]["lpf"]
+    hpf = coefficients[wavelet]["rec"]["hpf"]
+
+    signal_len = coeffs.shape[1]
+    current_len = lpf.shape[0] if multilevel else signal_len//2
+    while current_len <= signal_len//2:
+        lpin = coeffs[:,0:current_len,:]
+        hpin = coeffs[:,current_len:2*current_len,:]
+        interleaved = tf.transpose(interleave(
+            tf.transpose(lpin,[1,2,0]),
+            tf.transpose(hpin,[1,2,0])),[2,0,1])
+        lpout = conv(interleaved,lpf)
+        hpout = conv(interleaved,hpf)
+        out = tf.transpose(interleave(
+            tf.transpose(lpout,[1,2,0]),
+            tf.transpose(hpout,[1,2,0])),[2,0,1])
+        right = coeffs[:,2*current_len:,:]
+        coeffs = tf.concat([out,right],axis=1)
+        current_len*=2
+    return coeffs
 
 
 def split_coeffs(coeffs,filter_length):
@@ -86,15 +114,27 @@ def split_coeffs(coeffs,filter_length):
 
 
 if __name__=='__main__':
-    X,Y = signal([16,96],length=1024,overlap=True)
+    X,Y = signal([5],length=4096,overlap=True)
+    plt.plot(Y)
+    plt.show()
     yt = tf.reshape(tf.convert_to_tensor(Y,dtype=tf.float32),(1,Y.shape[0],1))
-    pcoeffs = dwt(yt)
-    coeffs = split_coeffs(tf.reshape(pcoeffs,(1024)).numpy(),8)
+    pcoeffs = dwt(yt,multilevel=True)
+    tcoeffs = pywt.dwt(Y,'db4',mode='periodization')
+    py_r = idwt(pcoeffs,multilevel=True)
+    py_r = tf.reshape(py_r,(py_r.shape[1]))
+    plt.plot(py_r.numpy())
+    plt.show()
+    pcoeffs = split_coeffs(tf.reshape(pcoeffs,(4096)).numpy(),8)
+    y_r = pywt.waverec(pcoeffs,'db4',mode='periodization')
+    plt.plot(y_r)
+    plt.show()
+    """
     for i in range(len(coeffs)-1):
         coeffs[-i] = np.zeros_like(coeffs[-i])
         y_r = pywt.waverec(coeffs,'db4',mode='periodization')
         plt.plot(y_r)
         plt.show()
+    """
 
 
     """
