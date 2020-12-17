@@ -114,9 +114,9 @@ def idwt(coeffs,wavelet="db4",maxlevel=-1):
     return coeffs
 
 
-def split_coeffs(coeffs,filter_length):
+def split_coeffs(coeffs,max_level):
     output = []
-    while len(coeffs) > filter_length:
+    while len(output) < max_level:
         output.append(coeffs[len(coeffs)//2:])
         coeffs = coeffs[0:len(coeffs)//2]
     output.append(coeffs)
@@ -137,12 +137,10 @@ if __name__=='__main__':
     plt.plot(py_r.numpy())
     plt.show()
 
-    """
-    pcoeffs = split_coeffs(tf.reshape(pcoeffs,(1024)).numpy(),4)
+    pcoeffs = split_coeffs(tf.reshape(pcoeffs,(1024)).numpy(),maxlevel)
     y_r = pywt.waverec(pcoeffs,'db4',mode='periodization')
     plt.plot(y_r)
     plt.show()
-    """
 
     """
     for i in range(len(coeffs)-1):
