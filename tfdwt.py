@@ -36,16 +36,23 @@ def print_matrix(m):
             print('{s:{c}^{n}}'.format(s=str(m[i,j]),c=' ',n=4),end=" ")
         print()
 
-class DWTDec(tf.keras.layers.Layer):
-    def __init__(self,wavelet='db4'):
-        super(DWTDec, self).__init__(name='dwt_dec_layer')
+class DWT(tf.keras.layers.Layer):
+    def __init__(self,wavelet='db4',mode='dec'):
+        super(DWT, self).__init__(name='dwt_'+mode)
         if wavelet!='db4':
-            raise NotImplemented()
+            raise NotImplementedError()
         self.coeffs = coeffs[wavelet]
+        self.transpose = None
+        if mode=='dec':
+            self.transpose=True
+        elif mode=='rec':
+            self.transpose=False
+        else:
+            raise ValueError("mode is either 'dec' for decomposition or 'rec' for reconstruction")
 
     def build(self,input_shape):
         self.w = tf.Variable(
-            initial_value = build_matrix(self.coeffs,input_shape[1],transpose=True),
+            initial_value = build_matrix(self.coeffs,input_shape[1],transpose=self.transpose),
             dtype=tf.float32,
             trainable=False
         )
@@ -67,42 +74,19 @@ class DWTDec(tf.keras.layers.Layer):
             self.input_var[:,(input.shape[1]//2**i)//2:input.shape[1]//2**i].assign(d)
         return tf.convert_to_tensor(self.input_var)
 
-class DWTRec(tf.keras.layers.Layer):
+class WaveDec(DWT):
     def __init__(self,wavelet='db4'):
-        super(DWTRec, self).__init__(name='dwt_rec_layer')
-        if wavelet!='db4':
-            raise NotImplemented()
-        self.coeffs = coeffs[wavelet]
+        super(WaveDec,self).__init__(wavelet=wavelet,mode='dec')
 
-    def build(self,input_shape):
-        self.w = tf.Variable(
-            initial_value = build_matrix(self.coeffs,input_shape[1],transpose=False),
-            dtype=tf.float32,
-            trainable=False
-        )
-        self.input_var = tf.Variable(
-            initial_value = tf.zeros(input_shape,dtype=tf.float32),
-            trainable=False
-        )
-        self.n_it = int(math.log2(input_shape[1]))-1
-
-    def call(self,input):
-        self.input_var.assign(input)
-        w = tf.convert_to_tensor(self.w)
-        for i in range(self.n_it):
-            w = w[0:input.shape[1]//2**i,0:input.shape[1]//2**i]
-            self.input_var[:,0:input.shape[1]//2**i].assign(tf.matmul(self.input_var[:,0:input.shape[1]//2**i],w))
-            a = self.input_var[:,0:input.shape[1]//2**i][:,::2]
-            d = self.input_var[:,0:input.shape[1]//2**i][:,1::2]
-            self.input_var[:,0:(input.shape[1]//2**i)//2].assign(a)
-            self.input_var[:,(input.shape[1]//2**i)//2:input.shape[1]//2**i].assign(d)
-        return tf.convert_to_tensor(self.input_var)
+class WaveRec(DWT):
+    def __init__(self,wavelet='db4'):
+        super(WaveRec,self).__init__(wavelet=wavelet,mode='rec')
 
 
 
 if __name__=="__main__":
-    dec = DWTDec()
-    rec = DWTRec()
+    dec = WaveDec()
+    rec = WaveRec()
     s = tf.convert_to_tensor(signal([5,50])[1])
     plt.plot(s.numpy())
     plt.show()
