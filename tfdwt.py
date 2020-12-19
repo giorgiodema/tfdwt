@@ -133,6 +133,36 @@ class WaveRec(tf.keras.layers.Layer):
             self.input_var[0:input.shape[1]//2**(self.max_level-i-1)].assign(self.idwt_layers[i](self.input_var[0:input.shape[1]//2**(self.max_level-i-1)]))
         return self.input_var
 
+class MultivariateWaveDec(tf.keras.layers.Layer):
+    def __init__(self,wavelet='db4',max_level=-1):
+        super(MultivariateWaveDec,self).__init__()
+        self.wavelet=wavelet
+        self.max_level=max_level
+    def build(self,input_shape):
+        self.wavedec = WaveDec(self.wavelet,self.max_level)
+        self.wavedec.build((input_shape[0],input_shape[1]))
+        self.td = tf.keras.layers.TimeDistributed(self.wavedec)
+    def call(self,input):
+        input = tf.transpose(input,[0,2,1])
+        input = self.td(input)
+        input = tf.transpose(input,[0,2,1])
+        return input
+
+class MultivariateWaveRec(tf.keras.layers.Layer):
+    def __init__(self,wavelet='db4',max_level=-1):
+        super(MultivariateWaveRec,self).__init__()
+        self.wavelet=wavelet
+        self.max_level=max_level
+    def build(self,input_shape):
+        self.waverec = WaveRec(self.wavelet,self.max_level)
+        self.waverec.build((input_shape[0],input_shape[1]))
+        self.td = tf.keras.layers.TimeDistributed(self.waverec)
+    def call(self,input):
+        input = tf.transpose(input,[0,2,1])
+        input = self.td(input)
+        input = tf.transpose(input,[0,2,1])
+        return input
+
 
 
 
@@ -188,16 +218,23 @@ def signal(frequencies,length=1024,sample_rate=10**-3,overlap=False,scale=True):
     return X,Y
 
 if __name__=="__main__":
-    dwt = WaveDec(max_level=-1)
-    idwt = WaveRec(max_level=-1)
-    s = tf.convert_to_tensor(signal([5,50])[1])
-    plt.plot(s.numpy())
-    plt.show()
-    s = tf.reshape(s,(1,1024))
-    o = dwt(s)
-    o = idwt(o)
-    plt.plot(o[0].numpy())
-    plt.show()
+    dec = MultivariateWaveDec(max_level=-1)
+    rec = MultivariateWaveRec(max_level=-1)
+    s1 = tf.convert_to_tensor(signal([5,50])[1])
+    s2 = tf.convert_to_tensor(signal([10,50],overlap=True)[1])
+    s = tf.stack([s1,s2],axis=-1)
+    s = tf.reshape(s,(1,1024,2))
+    for i in range(s.shape[2]):
+        plt.plot(s[0,:,i].numpy())
+        plt.title("Original")
+        plt.show()
+    
+    o = dec(s)
+    o = rec(o)
+    for i in range(o.shape[2]):
+        plt.plot(o[0,:,i].numpy())
+        plt.title("Reconstructed")
+        plt.show()
     print()
     """
     check_identity(coeffs['db4'])
