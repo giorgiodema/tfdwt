@@ -61,31 +61,21 @@ class DWT(tf.keras.layers.Layer):
             dtype=tf.float32,
             trainable=False
         )
-        self.input_var = tf.Variable(
-            initial_value = tf.zeros(input_shape,dtype=tf.float32),
-            trainable=False
-        )
-        self.n_it = int(math.log2(input_shape[1]))-1
 
     def call(self,input):
-        self.input_var.assign(input)
-        w = tf.convert_to_tensor(self.w)
-        for i in range(self.n_it):
-            w = w[0:input.shape[1]//2**i,0:input.shape[1]//2**i]
-            self.input_var[:,0:input.shape[1]//2**i].assign(tf.matmul(self.input_var[:,0:input.shape[1]//2**i],w))
-            a = self.input_var[:,0:input.shape[1]//2**i][:,::2]
-            d = self.input_var[:,0:input.shape[1]//2**i][:,1::2]
-            self.input_var[:,0:(input.shape[1]//2**i)//2].assign(a)
-            self.input_var[:,(input.shape[1]//2**i)//2:input.shape[1]//2**i].assign(d)
-        return tf.convert_to_tensor(self.input_var)
+        input = (tf.matmul(input,self.w))
+        a = input[:,::2]
+        d = input[:,1::2]
+        input = tf.concat([a,d],axis=1)
+        return input
 
 class IDWT(tf.keras.layers.Layer):
     """
     Compute the Discrete Wavelet Transform or the Inverse Discrete Wavelet Transform
     untill the maximum level of decomposition.
     """
-    def __init__(self,wavelet='db4',mode='dec'):
-        super(IDWT, self).__init__(name='idwt')
+    def __init__(self,wavelet='db4'):
+        super(IDWT, self).__init__(name='dwt_')
         if wavelet!='db4':
             raise NotImplementedError()
         self.coeffs = coeffs[wavelet]
@@ -96,58 +86,53 @@ class IDWT(tf.keras.layers.Layer):
             dtype=tf.float32,
             trainable=False
         )
-        self.input_var = tf.Variable(
-            initial_value = tf.zeros(input_shape,dtype=tf.float32),
-            trainable=False
-        )
-        self.n_it = int(math.log2(input_shape[1]))-1
 
     def call(self,input):
-        self.input_var.assign(input)
-        for i in range(self.n_it):
-            a = self.input_var[:,0:input.shape[1]//2**(self.n_it-i)]
-            d = self.input_var[:,0:input.shape[1]//2**(self.n_it-i)]
-            interleaved = tf.transpose(interleave(tf.transpose(a,[1,0]),tf.transpose(d,[1,0])),[1,0])
-            self.input_var[:,0:input.shape[1]//2**(self.n_it-i-1)].assign(interleaved)
-
-            w = self.w[0:input.shape[1]//2**(self.n_it-i-1),0:input.shape[1]//2**(self.n_it-i-1)]
-            self.input_var[:,0:input.shape[1]//2**(self.n_it-i-1)].assign(tf.matmul(self.input_var[:,0:input.shape[1]//2**(self.n_it-i-1)],w))
-        return tf.convert_to_tensor(self.input_var)
+        input = tf.transpose(interleave(tf.transpose(input[:,0:input.shape[1]//2],[1,0]),tf.transpose(input[:,input.shape[1]//2:],[1,0])),[1,0])
+        input = (tf.matmul(input,self.w))
+        return input
 
 
 class WaveDec(tf.keras.layers.Layer):
-    """
-    Compute the Wavelet Decomposition of a signal untill the maximum level of
-    decomposition.
-    Constructor Arguments:
-        -> wavelet: the name of the wavelet family
-    Call Arguments:
-        -> input: input signal, with shape [BS,SEQ_LEN,N_FEATURE]
-    """
-    def __init__(self,wavelet='db4'):
-        super(WaveDec,self).__init__(name="wave_dec")
-        self.dec = tf.keras.layers.TimeDistributed(DWT(wavelet=wavelet,mode='dec'))
+    def __init__(self,wavelet='db4',max_level=-1):
+        super(WaveDec,self).__init__()
+        self.wavelet=wavelet
+        self.max_level=max_level
+        self.coeffs = coeffs[wavelet]
+    def build(self,input_shape):
+        if self.max_level < 0:
+            self.max_level = int(math.log2(input_shape[1])) - 2
+        self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
+        self.dwt_layers = []
+        for i in range(self.max_level):
+            self.dwt_layers.append(DWT(wavelet=self.wavelet))
+            self.dwt_layers[i].build((input_shape[0],input_shape[1]//2**i))
     def call(self,input):
-        input = tf.transpose(input,[0,2,1])
-        return tf.transpose(self.dec(input),[0,2,1])
-
-        
+        self.input_var.assign(input)
+        for i in range(self.max_level):
+            self.input_var[0:input.shape[1]//2**i].assign(self.dwt_layers[i](self.input_var[0:input.shape[1]//2**i]))
+        return self.input_var
 
 class WaveRec(tf.keras.layers.Layer):
-    """
-    Compute the Wavelet Reconstruction of a signal untill the maximum level of
-    decomposition.
-    Constructor Arguments:
-        -> wavelet: the name of the wavelet family
-    Call Arguments:
-        -> input: coefficients, with shape [BS,SEQ_LEN,N_FEATURE]
-    """
-    def __init__(self,wavelet='db4'):
-        super(WaveRec,self).__init__(name="wave_rec")
-        self.rec = tf.keras.layers.TimeDistributed(DWT(wavelet=wavelet,mode='rec'))
+    def __init__(self,wavelet='db4',max_level=-1):
+        super(WaveRec,self).__init__()
+        self.wavelet=wavelet
+        self.max_level=max_level
+        self.coeffs = coeffs[wavelet]
+    def build(self,input_shape):
+        if self.max_level < 0:
+            self.max_level = int(math.log2(input_shape[1])) - 2
+        self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
+        self.idwt_layers = []
+        for i in range(self.max_level):
+            self.idwt_layers.append(IDWT(wavelet=self.wavelet))
+            self.idwt_layers[i].build((input_shape[0],input_shape[1]//2**i))
     def call(self,input):
-        input = tf.transpose(input,[0,2,1])
-        return tf.transpose(self.rec(input),[0,2,1])
+        self.input_var.assign(input)
+        for i in range(self.max_level):
+            self.input_var[0:input.shape[1]//2**(self.max_level-i-1)].assign(self.idwt_layers[i](self.input_var[0:input.shape[1]//2**(self.max_level-i-1)]))
+        return self.input_var
+
 
 
 
@@ -157,6 +142,22 @@ def print_matrix(m):
         for j in range(m.shape[1]):
             print('{s:{c}^{n}}'.format(s=str(m[i,j]),c=' ',n=4),end=" ")
         print()
+
+def check_identity(coeffs):
+    m1 = tf.convert_to_tensor(build_matrix(coeffs,1024,transpose=False),dtype=tf.float32)
+    m2 = tf.convert_to_tensor(build_matrix(coeffs,1024,transpose=True),dtype=tf.float32)
+    n_it = int(math.log2(1024))-1
+    for i in range(n_it):
+        m1 = m1[0:1024//2**i,0:1024//2**i]
+        m2 = m2[0:1024//2**i,0:1024//2**i]
+        prod = tf.matmul(m1,m2)
+        diag = tf.linalg.diag_part(prod)
+        print("shape={},diag_sum={},prod_sum={}".format(
+            prod.shape,
+            tf.reduce_sum(diag,axis=0),
+            tf.reduce_sum(prod,axis=[0,1])
+        ))
+
 
 def signal(frequencies,length=1024,sample_rate=10**-3,overlap=False,scale=True):
     """
@@ -187,6 +188,19 @@ def signal(frequencies,length=1024,sample_rate=10**-3,overlap=False,scale=True):
     return X,Y
 
 if __name__=="__main__":
+    dwt = WaveDec(max_level=-1)
+    idwt = WaveRec(max_level=-1)
+    s = tf.convert_to_tensor(signal([5,50])[1])
+    plt.plot(s.numpy())
+    plt.show()
+    s = tf.reshape(s,(1,1024))
+    o = dwt(s)
+    o = idwt(o)
+    plt.plot(o[0].numpy())
+    plt.show()
+    print()
+    """
+    check_identity(coeffs['db4'])
     dec = DWT()
     rec = IDWT()
     s = tf.convert_to_tensor(signal([5,50])[1])
@@ -198,3 +212,4 @@ if __name__=="__main__":
     plt.plot(o[0].numpy())
     plt.show()
     print()
+    """
