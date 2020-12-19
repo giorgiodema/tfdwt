@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 import math
-import matplotlib.pyplot as plt
 
 
 # Coefficients of the Mother
@@ -46,8 +45,18 @@ def build_matrix(coeffs,signal_len,transpose=False):
 
 class DWT(tf.keras.layers.Layer):
     """
-    Compute the Discrete Wavelet Transform or the Inverse Discrete Wavelet Transform
-    untill the maximum level of decomposition.
+    Compute The Discrete Wavelet Transform for univariate signals,
+    (for signals with multiple features see MultivariateDWT)
+    Constructor Parameters:
+        -> wavelet: wavelet function to use (up to now only db4 is supported)
+    Call Parameters:
+        -> input: the input signal, with shape (BS,SEQ_LEN), if the signal has 
+                  multiple features then use MultivariateDWT
+    Output:
+        -> output: the DWT coefficients with shape (BS,SEQ_LEN), where
+                   output[:,0:output.shape[1]//2] contains the approximation
+                   coefficients while output[:,output.shape[1]//2:] contains the
+                   detail coefficients
     """
     def __init__(self,wavelet='db4'):
         super(DWT, self).__init__(name='dwt_')
@@ -71,8 +80,19 @@ class DWT(tf.keras.layers.Layer):
 
 class IDWT(tf.keras.layers.Layer):
     """
-    Compute the Discrete Wavelet Transform or the Inverse Discrete Wavelet Transform
-    untill the maximum level of decomposition.
+    Compute the Inverse Discrete Wavelet Transform for univariate signals. (For
+    signals with multiple features see MultivariateIDWT)
+    Constructor Parameters:
+        -> wavelet: wavelet function to use (up to now only db4 is supported)
+    Call Parameters:
+        -> input: the DWT coefficients with shape (BS,SEQ_LEN), where
+                   output[:,0:output.shape[1]//2] contains the approximation
+                   coefficients while output[:,output.shape[1]//2:] contains the
+                   detail coefficients
+    Output:
+        -> output: the output signal, with shape (BS,SEQ_LEN), if the signal has 
+                  multiple features then use MultivariateDWT
+
     """
     def __init__(self,wavelet='db4'):
         super(IDWT, self).__init__(name='dwt_')
@@ -94,6 +114,23 @@ class IDWT(tf.keras.layers.Layer):
 
 
 class WaveDec(tf.keras.layers.Layer):
+    """
+    Compute the Wavelet Decomposition for univariate signals (for signal with multiple features
+    see MultivariateWaveDec)
+    Constructor Parameters:
+        -> wavelet: wavelet function to use (up to now only db4 is supported)
+        -> max_level: the maximum level of decomposition, if max_level=-1
+                      then the maximum level is int(log2(input_shape[1])) - 1
+    Call Parameters:
+        -> input: the input signal, with shape (BS,SEQ_LEN), if the signal has 
+                  multiple features then use MultivariateDWT
+    Output:
+        -> output: the DWT coefficients with shape (BS,SEQ_LEN), where
+                   output[:,0:output.shape[1]//2**(max_level-1)] contains the approximation
+                   coefficients while output[:,output.shape[1]//2**(i+1):output.shape[1]//2**(i)] 
+                   for i = [1,...] contains the detail coefficients of the level i
+    """
+
     def __init__(self,wavelet='db4',max_level=-1):
         super(WaveDec,self).__init__()
         self.wavelet=wavelet
@@ -101,7 +138,7 @@ class WaveDec(tf.keras.layers.Layer):
         self.coeffs = coeffs[wavelet]
     def build(self,input_shape):
         if self.max_level < 0:
-            self.max_level = int(math.log2(input_shape[1])) - 2
+            self.max_level = int(math.log2(input_shape[1])) - 1
         self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
         self.dwt_layers = []
         for i in range(self.max_level):
@@ -114,6 +151,23 @@ class WaveDec(tf.keras.layers.Layer):
         return self.input_var
 
 class WaveRec(tf.keras.layers.Layer):
+    """
+    Compute the Wavelet Reconstruction for univariate signals (for signal with multiple features
+    see MultivariateWaveDec)
+    Constructor Parameters:
+        -> wavelet: wavelet function to use (up to now only db4 is supported)
+        -> max_level: the maximum level of decomposition, if max_level=-1
+                      then the maximum level is int(log2(input_shape[1])) - 1
+    Call Parameters:
+        -> input: the DWT coefficients with shape (BS,SEQ_LEN), where
+                   output[:,0:output.shape[1]//2**(max_level-1)] contains the approximation
+                   coefficients while output[:,output.shape[1]//2**(i+1):output.shape[1]//2**(i)] 
+                   for i = [1,...] contains the detail coefficients of the level i
+    Output:
+        -> output: the output signal, with shape (BS,SEQ_LEN), if the signal has 
+                  multiple features then use MultivariateDWT
+
+    """
     def __init__(self,wavelet='db4',max_level=-1):
         super(WaveRec,self).__init__()
         self.wavelet=wavelet
@@ -121,7 +175,7 @@ class WaveRec(tf.keras.layers.Layer):
         self.coeffs = coeffs[wavelet]
     def build(self,input_shape):
         if self.max_level < 0:
-            self.max_level = int(math.log2(input_shape[1])) - 2
+            self.max_level = int(math.log2(input_shape[1])) - 1
         self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
         self.idwt_layers = []
         for i in range(self.max_level):
@@ -133,7 +187,49 @@ class WaveRec(tf.keras.layers.Layer):
             self.input_var[0:input.shape[1]//2**(self.max_level-i-1)].assign(self.idwt_layers[i](self.input_var[0:input.shape[1]//2**(self.max_level-i-1)]))
         return self.input_var
 
+class MultivariateDWT(tf.keras.layers.Layer):
+    """
+    Multivariate Verion of the DWT, input_shape
+    and output shape are (BS,SEQ_LEN,N_FEATURES)
+    """
+    def __init__(self,wavelet='db4'):
+        super(MultivariateDWT,self).__init__()
+        self.wavelet=wavelet
+    def build(self,input_shape):
+        self.dwt = DWT(self.wavelet)
+        self.dwt.build((input_shape[0],input_shape[1]))
+        self.td = tf.keras.layers.TimeDistributed(self.dwt)
+    def call(self,input):
+        input = tf.transpose(input,[0,2,1])
+        input = self.td(input)
+        input = tf.transpose(input,[0,2,1])
+        return input
+
+class MultivariateIDWT(tf.keras.layers.Layer):
+    """
+    Multivariate Verion of the IDWT, input_shape
+    and output shape are (BS,SEQ_LEN,N_FEATURES)
+    """
+
+    def __init__(self,wavelet='db4'):
+        super(MultivariateIDWT,self).__init__()
+        self.wavelet=wavelet
+    def build(self,input_shape):
+        self.idwt = IDWT(self.wavelet)
+        self.idwt.build((input_shape[0],input_shape[1]))
+        self.td = tf.keras.layers.TimeDistributed(self.idwt)
+    def call(self,input):
+        input = tf.transpose(input,[0,2,1])
+        input = self.td(input)
+        input = tf.transpose(input,[0,2,1])
+        return input
+
+
 class MultivariateWaveDec(tf.keras.layers.Layer):
+    """
+    Multivariate Verion of the WaveDec, input_shape
+    and output shape are (BS,SEQ_LEN,N_FEATURES)
+    """
     def __init__(self,wavelet='db4',max_level=-1):
         super(MultivariateWaveDec,self).__init__()
         self.wavelet=wavelet
@@ -149,6 +245,10 @@ class MultivariateWaveDec(tf.keras.layers.Layer):
         return input
 
 class MultivariateWaveRec(tf.keras.layers.Layer):
+    """
+    Multivariate Verion of the WaveRec, input_shape
+    and output shape are (BS,SEQ_LEN,N_FEATURES)
+    """
     def __init__(self,wavelet='db4',max_level=-1):
         super(MultivariateWaveRec,self).__init__()
         self.wavelet=wavelet
@@ -162,7 +262,6 @@ class MultivariateWaveRec(tf.keras.layers.Layer):
         input = self.td(input)
         input = tf.transpose(input,[0,2,1])
         return input
-
 
 
 
@@ -187,66 +286,3 @@ def check_identity(coeffs):
             tf.reduce_sum(diag,axis=0),
             tf.reduce_sum(prod,axis=[0,1])
         ))
-
-
-def signal(frequencies,length=1024,sample_rate=10**-3,overlap=False,scale=True):
-    """
-    The output signal is obtained 'composing' sinusoids, where the ith sinusoid has
-    frequency frequencies[i]. If overlap is True the sinusoids are summed, so each frequence
-    is present in every moment. If overlap is false the sinusoids are concatenated.
-    -> length is the number of samples
-    -> sample_rate is the sampling rate
-    -> scale, if True the ith sinusoid is scaled by a factor i
-    """
-    X = np.array([sample_rate*i for i in range(length)])
-    Y = np.zeros_like(X)
-    scales = np.ones_like(X,dtype=float)
-    for i in range(len(scales)):
-        scales[i] = scales[i] / (i+1)
-    if overlap:
-        for i,f in enumerate(frequencies):
-            if not scale:
-                Y = Y + np.sin(2*math.pi*f*X)
-            else:
-                Y = Y + scales[i]*np.sin(2*math.pi*f*X)
-    else:
-        split_size=int(length/len(frequencies))
-        for i,f in enumerate(frequencies):
-            Z = np.sin(2*math.pi*f*X)
-            Z = Z[i*split_size:(i+1)*split_size]
-            Y[i*split_size:(i+1)*split_size] = Z
-    return X,Y
-
-if __name__=="__main__":
-    dec = MultivariateWaveDec(max_level=-1)
-    rec = MultivariateWaveRec(max_level=-1)
-    s1 = tf.convert_to_tensor(signal([5,50])[1])
-    s2 = tf.convert_to_tensor(signal([10,50],overlap=True)[1])
-    s = tf.stack([s1,s2],axis=-1)
-    s = tf.reshape(s,(1,1024,2))
-    for i in range(s.shape[2]):
-        plt.plot(s[0,:,i].numpy())
-        plt.title("Original")
-        plt.show()
-    
-    o = dec(s)
-    o = rec(o)
-    for i in range(o.shape[2]):
-        plt.plot(o[0,:,i].numpy())
-        plt.title("Reconstructed")
-        plt.show()
-    print()
-    """
-    check_identity(coeffs['db4'])
-    dec = DWT()
-    rec = IDWT()
-    s = tf.convert_to_tensor(signal([5,50])[1])
-    plt.plot(s.numpy())
-    plt.show()
-    s = tf.reshape(s,(1,1024))
-    o = dec(s)
-    o = rec(o)
-    plt.plot(o[0].numpy())
-    plt.show()
-    print()
-    """

@@ -1,7 +1,6 @@
 import tensorflow as tf
 import numpy as np
 import math
-from tensorflow.python.ops.gen_array_ops import transpose
 import matplotlib.pyplot as plt
 from tfdwt import *
 
@@ -35,17 +34,25 @@ def signal(frequencies,length=1024,sample_rate=10**-3,overlap=False,scale=True):
     return X,Y
 
 if __name__=="__main__":
-    dec = WaveDec()
-    rec = WaveRec()
-    s = tf.convert_to_tensor(signal([5,50])[1])
-    plt.plot(s.numpy())
-    plt.show()
-    s = tf.reshape(s,(1,1024,1))
+    dec = MultivariateWaveDec(max_level=-1)
+    rec = MultivariateWaveRec(max_level=-1)
+    s1 = tf.convert_to_tensor(signal([5,50])[1])
+    s2 = tf.convert_to_tensor(signal([10,50],overlap=True)[1])
+    s = tf.stack([s1,s2],axis=-1)
+    s = tf.reshape(s,(1,1024,2))
+    for i in range(s.shape[2]):
+        plt.plot(s[0,:,i].numpy())
+        plt.title("Original")
+        plt.show()
+    
     o = dec(s)
-    plt.plot(o[0,:,0].numpy())
-    plt.show()
-    o = rec(s)
-    o = o[0,:,0].numpy()
-    plt.plot(o)
-    plt.show()
+    for i in range(o.shape[2]):
+        plt.plot(o[0,:,i].numpy())
+        plt.title("Coeffs")
+        plt.show()
+    o = rec(o)
+    for i in range(o.shape[2]):
+        plt.plot(o[0,:,i].numpy())
+        plt.title("Reconstructed")
+        plt.show()
     print()
