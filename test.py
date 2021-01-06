@@ -3,6 +3,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 from tfdwt import *
+import pywt
 
 
 def signal(frequencies,length=1024,sample_rate=10**-3,overlap=False,scale=True):
@@ -34,26 +35,23 @@ def signal(frequencies,length=1024,sample_rate=10**-3,overlap=False,scale=True):
     return X,Y
 
 if __name__=="__main__":
-    dec = MultivariateWaveDec(max_level=-1,wavelet="db4")
-    rec = MultivariateWaveRec(max_level=-1,wavelet="db4")
-    s1 = tf.convert_to_tensor(signal([5,50])[1])
-    s2 = tf.convert_to_tensor(signal([10,50],overlap=True)[1])
-    s = tf.stack([s1,s2],axis=-1)
-    s = tf.reshape(s,(1,1024,2))
-    fig,ax = plt.subplots(3,2)
-    for i in range(s.shape[2]):
-        plt.sca(ax[0,i])
-        plt.plot(s[0,:,i].numpy())
-        plt.title("Original ch {}".format(i))
-    
-    o = dec(s)
-    for i in range(o.shape[2]):
-        plt.sca(ax[1,i])
-        plt.plot(o[0,:,i].numpy())
-        plt.title("Coeffs ch {}".format(i))
-    o = rec(o)
-    for i in range(o.shape[2]):
-        plt.sca(ax[2,i])
-        plt.plot(o[0,:,i].numpy())
-        plt.title("Reconstructed ch {}".format(i))
+    rec = MultivariateWaveRec(max_level=3)
+    dec = MultivariateWaveDec(max_level=3)
+    s = signal([5,50])[1]
+    plt.plot(s)
+    plt.title("Original Signale")
+    plt.show()
+
+    s = tf.reshape(tf.convert_to_tensor(s),(1,1024,1))
+    c = dec(s)
+    """
+    c = pywt.wavedec(s,'db4',mode='periodization',level=3)
+    c = tf.concat(c,axis=0)
+    c = tf.reshape(c,(1,1024,1))
+    """
+
+    r = rec(c)
+    r = r[0,:,0].numpy()
+    plt.plot(r)
+    plt.title("Reconstructed Signal")
     plt.show()

@@ -6,7 +6,11 @@ import math
 # Coefficients of the Mother
 # Wavelet Functions
 coeffs = {
-    "db4":[0.4829629131445341,0.8365163037378079,0.2241438680420134, -0.1294095225512604]
+    "haar":[0.7071067812,0.7071067812],
+    "db4":[-0.1294095226,0.2241438680,0.8365163037, 0.4829629131],
+    "sym4":[0.48296291314469025,0.836516303737469,0.22414386804185735,-0.12940952255092145]
+
+
 }
 
 def interleave(t1,t2):
@@ -28,14 +32,29 @@ def build_matrix(coeffs,signal_len,transpose=False):
     decomposition matrix, otherwise the reconstruction
     matrix
     """
+    low_pass = np.array(coeffs)
+    high_pass = low_pass[::-1].copy()
+    high_pass[1::2] = - high_pass[1::2].copy()
+
+    # last two rows wrap around
+    # like convolutions with periodic boundary conditions
     m = np.zeros((signal_len,signal_len))
-    m[-2:,0:2] = np.array([[coeffs[2],coeffs[3]],[coeffs[1],-coeffs[0]]])
-    m[-2:,-2:] = np.array([[coeffs[0],coeffs[1]],[coeffs[3],-coeffs[2]]])
+    m[-2,0:len(coeffs)//2] = low_pass[len(coeffs)//2:].copy()
+    m[-1,0:len(coeffs)//2] = np.flip(low_pass[:len(coeffs)//2]).copy()
+    m[-1,0:len(coeffs)//2][1::2] = -m[-1,0:len(coeffs)//2][1::2].copy()
+    if len(m[-1,0:len(coeffs)//2])==1:
+        m[-1,0:len(coeffs)//2] = - m[-1,0:len(coeffs)//2]
+
+    m[-2,-len(coeffs)//2:] = low_pass[:len(coeffs)//2].copy()
+    m[-1,-len(coeffs)//2:] = np.flip(low_pass[len(coeffs)//2:]).copy()
+    m[-1,-len(coeffs)//2:][1::2] = -m[-1,-len(coeffs)//2:][1::2].copy()
+    if len(m[-1,-len(coeffs)//2:])==1:
+        m[-1,-len(coeffs)//2:] = - m[-1,-len(coeffs)//2:]
     shift = 0
 
     for i in range(0,m.shape[0]-2,2):
-        m[i,shift:shift+len(coeffs)] = np.array(coeffs)
-        m[i+1,shift:shift+len(coeffs)] = np.array([coeffs[3],-coeffs[2],coeffs[1],-coeffs[0]])
+        m[i,shift:shift+len(coeffs)] = low_pass.copy()
+        m[i+1,shift:shift+len(coeffs)] = high_pass.copy()
         shift+=2
     if transpose:
         m = np.transpose(m)
@@ -60,7 +79,7 @@ class DWT(tf.keras.layers.Layer):
     """
     def __init__(self,wavelet='db4'):
         super(DWT, self).__init__(name='dwt_')
-        if wavelet!='db4':
+        if wavelet not in coeffs.keys():
             raise NotImplementedError()
         self.coeffs = coeffs[wavelet]
 
@@ -96,7 +115,7 @@ class IDWT(tf.keras.layers.Layer):
     """
     def __init__(self,wavelet='db4'):
         super(IDWT, self).__init__(name='dwt_')
-        if wavelet!='db4':
+        if wavelet not in coeffs.keys():
             raise NotImplementedError()
         self.coeffs = coeffs[wavelet]
 
