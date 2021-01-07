@@ -1,19 +1,8 @@
 import tensorflow as tf
 import numpy as np
 import math
+from coefficients import coeffs
 
-
-# Coefficients of the Mother
-# Wavelet Functions
-coeffs = {
-    "haar":[0.7071067812,0.7071067812],
-    "db2":[-0.1294095226,0.2241438680,0.8365163037, 0.4829629131],
-    "db3":[0.035226291882100656,-0.08544127388224149,-0.13501102001039084,0.4598775021193313,0.8068915093133388,0.3326705529509569],
-    "db4":[-0.010597401784997278,0.032883011666982945,0.030841381835986965,-0.18703481171888114,-0.02798376941698385,0.6308807679295904,0.7148465705525415,0.23037781330885523],
-    "sym4":[0.48296291314469025,0.836516303737469,0.22414386804185735,-0.12940952255092145]
-
-
-}
 
 def get_wavelet_families():
     """
@@ -187,6 +176,9 @@ class WaveDec(tf.keras.layers.Layer):
             self.input_var[0:input.shape[1]//2**i].assign(self.dwt_layers[i](self.input_var[0:input.shape[1]//2**i]))
         return self.input_var
 
+    def get_max_decomposition_level(self):
+        return self.max_level
+
 class WaveRec(tf.keras.layers.Layer):
     """
     Compute the Wavelet Reconstruction for univariate signals (for signal with multiple features
@@ -228,6 +220,9 @@ class WaveRec(tf.keras.layers.Layer):
         for i in range(self.max_level):
             self.input_var[0:input.shape[1]//2**(self.max_level-i-1)].assign(self.idwt_layers[i](self.input_var[0:input.shape[1]//2**(self.max_level-i-1)]))
         return self.input_var
+
+    def get_max_decomposition_level(self):
+        return self.max_level
 
 class MultivariateDWT(tf.keras.layers.Layer):
     """
@@ -285,6 +280,8 @@ class MultivariateWaveDec(tf.keras.layers.Layer):
         input = self.td(input)
         input = tf.transpose(input,[0,2,1])
         return input
+    def get_max_decomposition_level(self):
+        return self.max_level
 
 class MultivariateWaveRec(tf.keras.layers.Layer):
     """
@@ -304,6 +301,8 @@ class MultivariateWaveRec(tf.keras.layers.Layer):
         input = self.td(input)
         input = tf.transpose(input,[0,2,1])
         return input
+    def get_max_decomposition_level(self):
+        return self.max_level
 
 
 
@@ -328,3 +327,10 @@ def check_identity(coeffs):
             tf.reduce_sum(diag,axis=0),
             tf.reduce_sum(prod,axis=[0,1])
         ))
+
+def print_summary(input_shape,batch_size):
+    inp = tf.keras.layers.Input(input_shape,batch_size=batch_size)
+    o = MultivariateWaveDec()(inp)
+    o = MultivariateWaveRec()(o)
+    m = tf.keras.Model(inputs=inp,outputs=o)
+    m.summary()

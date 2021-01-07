@@ -1,6 +1,8 @@
 # tfDiscreteWaveletTransform
 tfdwt is a tensorflow module that contains layers to compute Discrete Wavelet Transforms, as well as
-wavelet decomposition and reconstruction for both univariate and multivariate input signals
+wavelet decomposition and reconstruction for both univariate and multivariate input signals.
+NB: to build keras model with some of these layers the batch size must be specified in the
+input layer
 
 ## Class DWT
 Compute The Discrete Wavelet Transform for univariate signals,
@@ -36,7 +38,8 @@ see MultivariateWaveDec)
 ### Constructor Parameters:
 - wavelet: wavelet function to use (up to now only db4 is supported)
 - max_level: the maximum level of decomposition, if max_level=-1
-                    then the maximum level is int(log2(input_shape[1])) - 1
+                    then max_level is the maximum level of decomposition
+                    for the chosen wavelet family
 ### Call Parameters:
 - input: the input signal, with shape (BS,SEQ_LEN), if the signal has 
                 multiple features then use MultivariateDWT
@@ -52,7 +55,8 @@ see MultivariateWaveDec)
 ### Constructor Parameters:
 - wavelet: wavelet function to use (up to now only db4 is supported)
 - max_level: the maximum level of decomposition, if `max_level=-1`
-                    then the maximum level is `int(log2(input_shape[1])) - 1`
+                    then max_level is the maximum level of 
+                    decomposition for the chosen wavelet family
 ### Call Parameters:
 - input: the DWT coefficients with shape `(BS,SEQ_LEN)`, where
                 `output[:,0:output.shape[1]//2**(max_level-1)]` contains the approximation
