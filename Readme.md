@@ -4,6 +4,9 @@ wavelet decomposition and reconstruction for both univariate and multivariate in
 NB: to build keras model with some of these layers the batch size must be specified in the
 input layer
 
+## get_wavelet_families
+Return a list with the names of the available wavelet families
+
 ## Class DWT
 Compute The Discrete Wavelet Transform for univariate signals,
 (for signals with multiple features see MultivariateDWT)
