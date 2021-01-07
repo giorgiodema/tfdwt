@@ -47,6 +47,8 @@ def build_matrix(coeffs,signal_len,transpose=False):
             m[i,shift:shift+len(coeffs)] = low_pass.copy()
             m[i+1,shift:shift+len(coeffs)] = high_pass.copy()
         else:
+            #  last rows wrap around
+            # like convolutions with periodic boundary conditions
             low = low_pass[0:len(m[i,shift:shift+len(coeffs)])].copy()
             low_wrap = low_pass[len(m[i,shift:shift+len(coeffs)]):].copy()
             high = high_pass[0:len(m[i,shift:shift+len(coeffs)])].copy()
