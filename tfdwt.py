@@ -7,11 +7,19 @@ import math
 # Wavelet Functions
 coeffs = {
     "haar":[0.7071067812,0.7071067812],
-    "db4":[-0.1294095226,0.2241438680,0.8365163037, 0.4829629131],
+    "db2":[-0.1294095226,0.2241438680,0.8365163037, 0.4829629131],
+    "db3":[0.035226291882100656,-0.08544127388224149,-0.13501102001039084,0.4598775021193313,0.8068915093133388,0.3326705529509569],
+    "db4":[-0.010597401784997278,0.032883011666982945,0.030841381835986965,-0.18703481171888114,-0.02798376941698385,0.6308807679295904,0.7148465705525415,0.23037781330885523],
     "sym4":[0.48296291314469025,0.836516303737469,0.22414386804185735,-0.12940952255092145]
 
 
 }
+
+def get_wavelet_families():
+    """
+    list all the wavelet families available
+    """
+    return list(coeffs.keys())
 
 def interleave(t1,t2):
     """
@@ -25,6 +33,12 @@ def interleave(t1,t2):
     out = tf.dynamic_stitch([even_pos,odd_pos],[t1,t2])
     return out
 
+def wrap_around_(m,low_pass,high_pass,row):
+    m[row,0:len(low_pass)//2] = low_pass[len(low_pass)//2:].copy()
+    m[row,-len(low_pass)//2:] = low_pass[0:len(low_pass)//2].copy()
+    m[row+1,0:len(low_pass)//2] = high_pass[len(low_pass)//2:].copy()
+    m[row+1,-len(low_pass)//2:] = high_pass[0:len(low_pass)//2].copy()
+
 def build_matrix(coeffs,signal_len,transpose=False):
     """
     build the transformation matrix of the given
@@ -34,27 +48,25 @@ def build_matrix(coeffs,signal_len,transpose=False):
     """
     low_pass = np.array(coeffs)
     high_pass = low_pass[::-1].copy()
-    high_pass[1::2] = - high_pass[1::2].copy()
+    high_pass[0::2] = - high_pass[0::2].copy()
 
-    # last two rows wrap around
-    # like convolutions with periodic boundary conditions
     m = np.zeros((signal_len,signal_len))
-    m[-2,0:len(coeffs)//2] = low_pass[len(coeffs)//2:].copy()
-    m[-1,0:len(coeffs)//2] = np.flip(low_pass[:len(coeffs)//2]).copy()
-    m[-1,0:len(coeffs)//2][1::2] = -m[-1,0:len(coeffs)//2][1::2].copy()
-    if len(m[-1,0:len(coeffs)//2])==1:
-        m[-1,0:len(coeffs)//2] = - m[-1,0:len(coeffs)//2]
-
-    m[-2,-len(coeffs)//2:] = low_pass[:len(coeffs)//2].copy()
-    m[-1,-len(coeffs)//2:] = np.flip(low_pass[len(coeffs)//2:]).copy()
-    m[-1,-len(coeffs)//2:][1::2] = -m[-1,-len(coeffs)//2:][1::2].copy()
-    if len(m[-1,-len(coeffs)//2:])==1:
-        m[-1,-len(coeffs)//2:] = - m[-1,-len(coeffs)//2:]
     shift = 0
 
-    for i in range(0,m.shape[0]-2,2):
-        m[i,shift:shift+len(coeffs)] = low_pass.copy()
-        m[i+1,shift:shift+len(coeffs)] = high_pass.copy()
+    for i in range(0,m.shape[0],2):
+        if len(m[i,shift:shift+len(coeffs)]) == len(coeffs):
+            m[i,shift:shift+len(coeffs)] = low_pass.copy()
+            m[i+1,shift:shift+len(coeffs)] = high_pass.copy()
+        else:
+            low = low_pass[0:len(m[i,shift:shift+len(coeffs)])].copy()
+            low_wrap = low_pass[len(m[i,shift:shift+len(coeffs)]):].copy()
+            high = high_pass[0:len(m[i,shift:shift+len(coeffs)])].copy()
+            high_wrap = high_pass[len(m[i,shift:shift+len(coeffs)]):].copy()
+            m[i,shift:shift+len(low)] = low
+            m[i+1,shift:shift+len(high)] = high
+            m[i,0:len(low_wrap)] = low_wrap
+            m[i+1,0:len(high_wrap)] = high_wrap
+
         shift+=2
     if transpose:
         m = np.transpose(m)
@@ -139,7 +151,8 @@ class WaveDec(tf.keras.layers.Layer):
     Constructor Parameters:
         -> wavelet: wavelet function to use (up to now only db4 is supported)
         -> max_level: the maximum level of decomposition, if max_level=-1
-                      then the maximum level is int(log2(input_shape[1])) - 1
+                      then the max_level is the maximum level of decomposition
+                      for the specified wavelet
     Call Parameters:
         -> input: the input signal, with shape (BS,SEQ_LEN), if the signal has 
                   multiple features then use MultivariateDWT
@@ -157,7 +170,12 @@ class WaveDec(tf.keras.layers.Layer):
         self.coeffs = coeffs[wavelet]
     def build(self,input_shape):
         if self.max_level < 0:
-            self.max_level = int(math.log2(input_shape[1])) - 1
+            self.max_level = 0
+            inp = input_shape[1]//2
+            while inp >= len(coeffs):
+                inp = inp//2
+                self.max_level+=1
+
         self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
         self.dwt_layers = []
         for i in range(self.max_level):
@@ -176,7 +194,8 @@ class WaveRec(tf.keras.layers.Layer):
     Constructor Parameters:
         -> wavelet: wavelet function to use (up to now only db4 is supported)
         -> max_level: the maximum level of decomposition, if max_level=-1
-                      then the maximum level is int(log2(input_shape[1])) - 1
+                      then max_level is the maximum level
+                      of decomposition for the specified wavelet
     Call Parameters:
         -> input: the DWT coefficients with shape (BS,SEQ_LEN), where
                    output[:,0:output.shape[1]//2**(max_level-1)] contains the approximation
@@ -194,7 +213,11 @@ class WaveRec(tf.keras.layers.Layer):
         self.coeffs = coeffs[wavelet]
     def build(self,input_shape):
         if self.max_level < 0:
-            self.max_level = int(math.log2(input_shape[1])) - 1
+            self.max_level = 0
+            inp = input_shape[1]//2
+            while inp >= len(coeffs):
+                inp = inp//2
+                self.max_level+=1
         self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
         self.idwt_layers = []
         for i in range(self.max_level):
