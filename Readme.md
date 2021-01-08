@@ -17,9 +17,7 @@ Compute The Discrete Wavelet Transform for univariate signals,
                 multiple features then use MultivariateDWT
 ### Output:
 - output: the DWT coefficients with shape `(BS,SEQ_LEN)`, where
-                `output[:,0:output.shape[1]//2]` contains the approximation
-                coefficients while `output[:,output.shape[1]//2:]` contains the
-                detail coefficients
+                `output = [Ca,Cd]` where Ca and Cd are the approximation and detail coefficients 
 
 ## Class IDWT
 Compute the Inverse Discrete Wavelet Transform for univariate signals. (For
@@ -28,9 +26,7 @@ signals with multiple features see MultivariateIDWT)
 - wavelet: wavelet function to use (check 'get_wavelet_families' to see which wavelet functions are supported)
 ### Call Parameters:
 - input: the DWT coefficients with shape `(BS,SEQ_LEN)`, where
-                `output[:,0:output.shape[1]//2]` contains the approximation
-                coefficients while `output[:,output.shape[1]//2:]` contains the
-                detail coefficients
+                `input = [Ca,Cd]` where Ca and Cd are the approximation and detail coefficients
 ### Output:
 - output: the output signal, with shape `(BS,SEQ_LEN)`, if the signal has 
                 multiple features then use MultivariateDWT
@@ -42,15 +38,16 @@ see MultivariateWaveDec)
 - wavelet: wavelet function to use (check 'get_wavelet_families' to see which wavelet functions are supported)
 - max_level: the maximum level of decomposition, if max_level=-1
                     then max_level is the maximum level of decomposition
-                    for the chosen wavelet family
+                    for the chosen wavelet family. The signal is decomposed untill
+                    the length of the output of the decomposition is greater than the
+                    length of the filter.
 ### Call Parameters:
 - input: the input signal, with shape (BS,SEQ_LEN), if the signal has 
                 multiple features then use MultivariateDWT
 ### Output:
 - output: the DWT coefficients with shape `(BS,SEQ_LEN)`, where
-                `output[:,0:output.shape[1]//2**(max_level-1)]` contains the approximation
-                coefficients while `output[:,output.shape[1]//2**(i+1):output.shape[1]//2**(i)] `
-                for `i = [1,...]` contains the detail coefficients of the level i
+                `output = [Ca_n,Cd_n,Cd_n-1,...,Cd_1]` where the length of
+                Cd_n is one half of the length of Cd_n-1
 
 ## Class WaveRec
 Compute the Wavelet Reconstruction for univariate signals (for signal with multiple features
@@ -62,9 +59,8 @@ see MultivariateWaveDec)
                     decomposition for the chosen wavelet family
 ### Call Parameters:
 - input: the DWT coefficients with shape `(BS,SEQ_LEN)`, where
-                `output[:,0:output.shape[1]//2**(max_level-1)]` contains the approximation
-                coefficients while `output[:,output.shape[1]//2**(i+1):output.shape[1]//2**(i)]` 
-                for `i = [1,...]` contains the detail coefficients of the level i
+                `input = [Ca_n,Cd_n,Cd_n-1,...,Cd_1]` where the length of
+                Cd_n is one half of the length of Cd_n-1
 ### Output:
 - output: the output signal, with shape `(BS,SEQ_LEN)`, if the signal has 
                 multiple features then use MultivariateDWT
