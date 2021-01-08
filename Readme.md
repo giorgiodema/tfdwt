@@ -11,7 +11,7 @@ Return a list with the names of the available wavelet families
 Compute The Discrete Wavelet Transform for univariate signals,
 (for signals with multiple features see MultivariateDWT)
 ### Constructor Parameters:
-- wavelet: wavelet function to use (up to now only db4 is supported)
+- wavelet: wavelet function to use (check 'get_wavelet_families' to see which wavelet functions are supported)
 ### Call Parameters:
 - input: the input signal, with shape (BS,SEQ_LEN), if the signal has 
                 multiple features then use MultivariateDWT
@@ -25,7 +25,7 @@ Compute The Discrete Wavelet Transform for univariate signals,
 Compute the Inverse Discrete Wavelet Transform for univariate signals. (For
 signals with multiple features see MultivariateIDWT)
 ### Constructor Parameters:
-- wavelet: wavelet function to use (up to now only db4 is supported)
+- wavelet: wavelet function to use (check 'get_wavelet_families' to see which wavelet functions are supported)
 ### Call Parameters:
 - input: the DWT coefficients with shape `(BS,SEQ_LEN)`, where
                 `output[:,0:output.shape[1]//2]` contains the approximation
@@ -39,7 +39,7 @@ signals with multiple features see MultivariateIDWT)
 Compute the Wavelet Decomposition for univariate signals (for signal with multiple features
 see MultivariateWaveDec)
 ### Constructor Parameters:
-- wavelet: wavelet function to use (up to now only db4 is supported)
+- wavelet: wavelet function to use (check 'get_wavelet_families' to see which wavelet functions are supported)
 - max_level: the maximum level of decomposition, if max_level=-1
                     then max_level is the maximum level of decomposition
                     for the chosen wavelet family
@@ -56,7 +56,7 @@ see MultivariateWaveDec)
 Compute the Wavelet Reconstruction for univariate signals (for signal with multiple features
 see MultivariateWaveDec)
 ### Constructor Parameters:
-- wavelet: wavelet function to use (up to now only db4 is supported)
+- wavelet: wavelet function to use (check 'get_wavelet_families' to see which wavelet functions are supported)
 - max_level: the maximum level of decomposition, if `max_level=-1`
                     then max_level is the maximum level of 
                     decomposition for the chosen wavelet family
