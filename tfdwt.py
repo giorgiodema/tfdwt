@@ -22,12 +22,6 @@ def interleave(t1,t2):
     out = tf.dynamic_stitch([even_pos,odd_pos],[t1,t2])
     return out
 
-def wrap_around_(m,low_pass,high_pass,row):
-    m[row,0:len(low_pass)//2] = low_pass[len(low_pass)//2:].copy()
-    m[row,-len(low_pass)//2:] = low_pass[0:len(low_pass)//2].copy()
-    m[row+1,0:len(low_pass)//2] = high_pass[len(low_pass)//2:].copy()
-    m[row+1,-len(low_pass)//2:] = high_pass[0:len(low_pass)//2].copy()
-
 def build_matrix(coeffs,signal_len,transpose=False):
     """
     build the transformation matrix of the given
