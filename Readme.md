@@ -1,4 +1,4 @@
-# tfDiscreteWaveletTransform
+# tfdwt
 tfdwt is a tensorflow module that contains layers to compute Discrete Wavelet Transforms, as well as
 wavelet decomposition and reconstruction for both univariate and multivariate input signals.
 NB: to build keras model with some of these layers the batch size must be specified in the
