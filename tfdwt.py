@@ -4,7 +4,7 @@ import math
 from coefficients import coeffs
 
 
-def get_wavelet_families():
+def get_wavelets():
     """
     list all the wavelet families available
     """
