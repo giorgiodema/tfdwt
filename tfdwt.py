@@ -10,6 +10,34 @@ def get_wavelets():
     """
     return list(coeffs.keys())
 
+def split_coeffs(coefficients,wavelet='db4',max_level=-1):
+    """
+    receive as input the output of the decomposition with shape (BS,SEQ_LEN) or
+    (BS,SEQ_LEN,NFEATURE) and produce a tensorarray of coefficients with the form
+    [CAn,CDn,CDn-1,...,CD1]
+    """
+    shape_len = len(coefficients.shape)
+    if shape_len==2:
+        coefficients = tf.reshape(coefficients,(coefficients.shape[0],coefficients.shape[1],1))
+    if max_level < 0:
+        max_level = 0
+        inp = coefficients.shape[1]//2
+        while inp >= len(coeffs[wavelet]):
+            inp = inp//2
+            max_level+=1
+    a = tf.TensorArray(
+        tf.float32,
+        infer_shape=False,
+        element_shape=tf.TensorShape([coefficients.shape[0],None,coefficients.shape[2]]),
+        size=max_level+1)
+    for i in range(max_level-1):
+        a.write(max_level-i,coefficients[:,coefficients.shape[1]//2:,:])
+        coefficients = coefficients[:,0:coefficients.shape[1]//2,:]
+    a.write(1,coefficients[:,coefficients.shape[1]//2:,:])
+    a.write(0,coefficients[:,0:coefficients.shape[1]//2,:])
+    return a
+
+
 def interleave(t1,t2):
     """
     Produce a new tensor t which elements are the elements
@@ -157,7 +185,7 @@ class WaveDec(tf.keras.layers.Layer):
         if self.max_level < 0:
             self.max_level = 0
             inp = input_shape[1]//2
-            while inp >= len(coeffs):
+            while inp >= len(coeffs[self.wavelet]):
                 inp = inp//2
                 self.max_level+=1
 
@@ -169,7 +197,7 @@ class WaveDec(tf.keras.layers.Layer):
     def call(self,input):
         self.input_var.assign(input)
         for i in range(self.max_level):
-            self.input_var[0:input.shape[1]//2**i].assign(self.dwt_layers[i](self.input_var[0:input.shape[1]//2**i]))
+            self.input_var[:,0:input.shape[1]//2**i].assign(self.dwt_layers[i](self.input_var[:,0:input.shape[1]//2**i]))
         return self.input_var
 
     def get_max_decomposition_level(self):
@@ -203,7 +231,7 @@ class WaveRec(tf.keras.layers.Layer):
         if self.max_level < 0:
             self.max_level = 0
             inp = input_shape[1]//2
-            while inp >= len(coeffs):
+            while inp >= len(coeffs[self.wavelet]):
                 inp = inp//2
                 self.max_level+=1
         self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
@@ -214,7 +242,7 @@ class WaveRec(tf.keras.layers.Layer):
     def call(self,input):
         self.input_var.assign(input)
         for i in range(self.max_level):
-            self.input_var[0:input.shape[1]//2**(self.max_level-i-1)].assign(self.idwt_layers[i](self.input_var[0:input.shape[1]//2**(self.max_level-i-1)]))
+            self.input_var[:,0:input.shape[1]//2**(self.max_level-i-1)].assign(self.idwt_layers[i](self.input_var[:,0:input.shape[1]//2**(self.max_level-i-1)]))
         return self.input_var
 
     def get_max_decomposition_level(self):
@@ -277,7 +305,7 @@ class MultivariateWaveDec(tf.keras.layers.Layer):
         input = tf.transpose(input,[0,2,1])
         return input
     def get_max_decomposition_level(self):
-        return self.max_level
+        return self.wavedec.max_level
 
 class MultivariateWaveRec(tf.keras.layers.Layer):
     """
@@ -298,7 +326,7 @@ class MultivariateWaveRec(tf.keras.layers.Layer):
         input = tf.transpose(input,[0,2,1])
         return input
     def get_max_decomposition_level(self):
-        return self.max_level
+        return self.waverec.max_level
 
 
 
