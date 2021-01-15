@@ -198,7 +198,7 @@ class WaveDec(tf.keras.layers.Layer):
         self.input_var.assign(input)
         for i in range(self.max_level):
             self.input_var[:,0:input.shape[1]//2**i].assign(self.dwt_layers[i](self.input_var[:,0:input.shape[1]//2**i]))
-        return self.input_var
+        return tf.convert_to_tensor(self.input_var)
 
     def get_max_decomposition_level(self):
         return self.max_level
@@ -243,7 +243,7 @@ class WaveRec(tf.keras.layers.Layer):
         self.input_var.assign(input)
         for i in range(self.max_level):
             self.input_var[:,0:input.shape[1]//2**(self.max_level-i-1)].assign(self.idwt_layers[i](self.input_var[:,0:input.shape[1]//2**(self.max_level-i-1)]))
-        return self.input_var
+        return tf.convert_to_tensor(self.input_var)
 
     def get_max_decomposition_level(self):
         return self.max_level
