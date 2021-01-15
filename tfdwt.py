@@ -10,6 +10,20 @@ def get_wavelets():
     """
     return list(coeffs.keys())
 
+def filter_len(wavelet):
+    """
+    return the length of the filter of the given wavelet
+    """
+    return len(coeffs[wavelet])
+
+def dwt_max_level(data_len,wavelet):
+    """
+    return the maximum decomposition level for the specified
+    lenght of the input signal (data_len) and the specified
+    wavelet function (wavelet)
+    """
+    return int(math.log2(data_len/(filter_len(wavelet)-1)))
+
 def split_coeffs(coefficients,wavelet='db4',max_level=-1):
     """
     receive as input the output of the decomposition with shape (BS,SEQ_LEN) or
