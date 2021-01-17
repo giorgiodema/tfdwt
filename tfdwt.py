@@ -203,16 +203,26 @@ class WaveDec(tf.keras.layers.Layer):
                 inp = inp//2
                 self.max_level+=1
 
-        self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
         self.dwt_layers = []
         for i in range(self.max_level):
             self.dwt_layers.append(DWT(wavelet=self.wavelet))
             self.dwt_layers[i].build((input_shape[0],input_shape[1]//2**i))
     def call(self,input):
-        self.input_var.assign(input)
+        outputs = tf.TensorArray(
+            tf.float32, size=self.max_level+1, dynamic_size=False, clear_after_read=False,
+            infer_shape=False,
+            element_shape=tf.TensorShape([None,input.shape[0]])
+        )
         for i in range(self.max_level):
-            self.input_var[:,0:input.shape[1]//2**i].assign(self.dwt_layers[i](self.input_var[:,0:input.shape[1]//2**i]))
-        return tf.convert_to_tensor(self.input_var)
+            o = self.dwt_layers[i](input)
+            a = o[:,0:o.shape[1]//2]
+            d = o[:,o.shape[1]//2:]
+            outputs.write(self.max_level-i,tf.transpose(d,[1,0]))
+            input = a
+        outputs.write(0,tf.transpose(input,[1,0]))
+        o = outputs.concat()
+        o = tf.transpose(o,[1,0])
+        return o
 
     def get_max_decomposition_level(self):
         return self.max_level
@@ -248,16 +258,20 @@ class WaveRec(tf.keras.layers.Layer):
             while inp >= len(coeffs[self.wavelet]):
                 inp = inp//2
                 self.max_level+=1
-        self.input_var = tf.Variable(tf.zeros(input_shape,dtype=tf.float32),trainable=False)
         self.idwt_layers = []
         for i in range(self.max_level):
             self.idwt_layers.append(IDWT(wavelet=self.wavelet))
             self.idwt_layers[i].build((input_shape[0],input_shape[1]//2**i))
     def call(self,input):
-        self.input_var.assign(input)
-        for i in range(self.max_level):
-            self.input_var[:,0:input.shape[1]//2**(self.max_level-i-1)].assign(self.idwt_layers[i](self.input_var[:,0:input.shape[1]//2**(self.max_level-i-1)]))
-        return tf.convert_to_tensor(self.input_var)
+        a = input[:,0:input.shape[1]//2**(self.max_level-1)]
+        a = self.idwt_layers[0](a)
+        for i in range(self.max_level-1):
+            a = tf.concat([
+                a,
+                input[:,input.shape[1]//2**(self.max_level-i-1):input.shape[1]//2**(self.max_level-i-2)]
+            ],axis=1)
+            a = self.idwt_layers[i+1](a)
+        return a
 
     def get_max_decomposition_level(self):
         return self.max_level
