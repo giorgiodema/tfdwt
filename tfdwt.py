@@ -45,10 +45,10 @@ def split_coeffs(coefficients,wavelet='db4',max_level=-1):
         element_shape=tf.TensorShape([coefficients.shape[0],None,coefficients.shape[2]]),
         size=max_level+1)
     for i in range(max_level-1):
-        a.write(max_level-i,coefficients[:,coefficients.shape[1]//2:,:])
+        a = a.write(max_level-i,coefficients[:,coefficients.shape[1]//2:,:])
         coefficients = coefficients[:,0:coefficients.shape[1]//2,:]
-    a.write(1,coefficients[:,coefficients.shape[1]//2:,:])
-    a.write(0,coefficients[:,0:coefficients.shape[1]//2,:])
+    a = a.write(1,coefficients[:,coefficients.shape[1]//2:,:])
+    a = a.write(0,coefficients[:,0:coefficients.shape[1]//2,:])
     return a
 
 
@@ -217,9 +217,9 @@ class WaveDec(tf.keras.layers.Layer):
             o = self.dwt_layers[i](input)
             a = o[:,0:o.shape[1]//2]
             d = o[:,o.shape[1]//2:]
-            outputs.write(self.max_level-i,tf.transpose(d,[1,0]))
+            outputs = outputs.write(self.max_level-i,tf.transpose(d,[1,0]))
             input = a
-        outputs.write(0,tf.transpose(input,[1,0]))
+        outputs = outputs.write(0,tf.transpose(input,[1,0]))
         o = outputs.concat()
         o = tf.transpose(o,[1,0])
         return o
