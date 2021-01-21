@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import math
-from coefficients import coeffs
+from tfdwt.coefficients import coeffs
 import matplotlib.pyplot as plt
 
 
@@ -245,6 +245,7 @@ class WaveDec(tf.keras.layers.Layer):
         for i in range(self.max_level):
             self.dwt_layers.append(DWT(wavelet=self.wavelet))
             self.dwt_layers[i].build((input_shape[0],input_shape[1]//2**i))
+        self.reshape = tf.keras.layers.Reshape((input_shape[1],))
     def call(self,input):
         outputs = tf.TensorArray(
             tf.float32, size=self.max_level+1, dynamic_size=False, clear_after_read=False,
@@ -260,7 +261,7 @@ class WaveDec(tf.keras.layers.Layer):
         outputs = outputs.write(0,tf.transpose(input,[1,0]))
         o = outputs.concat()
         o = tf.transpose(o,[1,0])
-        return o
+        return self.reshape(o)
 
     def get_max_decomposition_level(self):
         return self.max_level
