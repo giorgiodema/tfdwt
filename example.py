@@ -40,7 +40,7 @@ if __name__=="__main__":
     s2 = tf.convert_to_tensor(signal([10,50],overlap=True)[1])
     s = tf.stack([s1,s2],axis=-1)
     s = tf.reshape(s,(1,1024,2))
-    fig,ax = plt.subplots(3,2)
+    fig,ax = plt.subplots(4,2)
     for i in range(s.shape[2]):
         plt.sca(ax[0,i])
         plt.plot(s[0,:,i].numpy())
@@ -51,9 +51,13 @@ if __name__=="__main__":
         plt.sca(ax[1,i])
         plt.plot(o[0,:,i].numpy())
         plt.title("Coeffs ch {}".format(i))
-    o = rec(o)
     for i in range(o.shape[2]):
         plt.sca(ax[2,i])
+        plt.title("time freq plot")
+        time_freq_plot(o[0,:,i],wavelet='db4',max_level=-1,ax=ax[2,i])
+    o = rec(o)
+    for i in range(o.shape[2]):
+        plt.sca(ax[3,i])
         plt.plot(o[0,:,i].numpy())
         plt.title("Reconstructed ch {}".format(i))
     plt.show()

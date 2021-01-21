@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 import math
 from coefficients import coeffs
+import matplotlib.pyplot as plt
 
 
 def get_wavelets():
@@ -50,6 +51,43 @@ def split_coeffs(coefficients,wavelet='db4',max_level=-1):
     a = a.write(1,coefficients[:,coefficients.shape[1]//2:,:])
     a = a.write(0,coefficients[:,0:coefficients.shape[1]//2,:])
     return a
+
+def time_freq_plot(coefficients,wavelet='db4',max_level=-1,drop_low=0,drop_high=0,ax=None):
+    """
+    plot the time-frequency decomposition for the coefficients received as input. The input should 
+    have shape = (SEQ_LEN), so it is not batched and it has a single channel.
+    -> wavelet: the wavelet function used for decomposition
+    -> maxlevel: the level of decomposition (-1 for the maximum level)
+    -> drop_low: how many low frequency bands should be not included in the plot (starting from the lowest)
+    -> drop_high: how many high frequency bands should be not included in the plot (starting from the highest)
+    """
+    if len(coefficients.shape)!=1:
+        raise ValueError("coefficients must have a single dimension (sequence length)")
+    coefficients = tf.reshape(coefficients,(1,coefficients.shape[0]))
+    coefficients = split_coeffs(coefficients,wavelet,max_level)
+    y_labels = []
+    coeffs = []
+    for i in range(coefficients.size()):
+        coeffs.append(coefficients.read(i)[0].numpy())
+    for k in range(len(coeffs)-1):
+        y_labels.append("f/{}".format(2**(k+1)))
+    y_labels.reverse()
+    y_labels = ['0'] + y_labels + ['f']
+    for k in range(len(coeffs)):
+        coeffs[k] = np.repeat(coeffs[k],len(coeffs[-1])//len(coeffs[k]))
+    coeffs = coeffs[drop_low:len(coeffs)-drop_high]
+    y_ticks = range(len(coeffs)+1)
+    y_labels = y_labels[drop_low:len(y_labels)-drop_high]
+
+    coeffs = np.stack(coeffs)
+    coeffs = np.abs(coeffs)
+    if ax:
+        plt.sca(ax)
+    plt.imshow(coeffs,aspect='auto',interpolation='nearest',origin='lower',extent=[0,len(coeffs[0]),0,len(coeffs)])
+    plt.yticks(y_ticks,y_labels)
+    plt.colorbar()
+    if not ax:
+        plt.show()
 
 
 def interleave(t1,t2):
