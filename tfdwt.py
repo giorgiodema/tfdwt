@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import math
-from tfdwt.coefficients import coeffs
+from coefficients import coeffs
 import matplotlib.pyplot as plt
 
 
