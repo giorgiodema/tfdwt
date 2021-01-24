@@ -139,6 +139,34 @@ def build_matrix(coeffs,signal_len,transpose=False):
 
 
 
+class SplitCoefficients(tf.keras.layers.Layer):
+    
+    def __init__(self,wavelet='db4',max_level=-1):
+        super().__init__()
+        self.wavelet=wavelet
+        self.max_level=max_level
+
+    def build(self,input_shape):
+        if self.max_level<0:
+            self.max_level = dwt_max_level(input_shape[1],self.wavelet)
+        self.shape_len=len(input_shape)
+
+    def call(self,input):
+        shape=tf.TensorShape([None,None,input.shape[2]]) if self.shape_len==3 else tf.TensorShape([None,None])
+        a = tf.TensorArray(
+            tf.float32,
+            infer_shape=False,
+            element_shape=shape,
+            size=self.max_level+1)
+        for i in range(self.max_level-1):
+            a = a.write(self.max_level-i,input[:,input.shape[1]//2:,:]) if self.shape_len==3 else a.write(self.max_level-i,input[:,input.shape[1]//2:])
+            input = input[:,0:input.shape[1]//2,:] if self.shape_len==3 else input[:,0:input.shape[1]//2]
+        a = a.write(1,input[:,input.shape[1]//2:,:]) if self.shape_len==3 else a.write(1,input[:,input.shape[1]//2])
+        a = a.write(0,input[:,0:input.shape[1]//2,:]) if self.shape_len==3 else a.write(0,input[:,0:input.shape[1]//2])
+        return a
+
+
+
 class DWT(tf.keras.layers.Layer):
     """
     Compute The Discrete Wavelet Transform for univariate signals,
@@ -250,7 +278,7 @@ class WaveDec(tf.keras.layers.Layer):
         outputs = tf.TensorArray(
             tf.float32, size=self.max_level+1, dynamic_size=False, clear_after_read=False,
             infer_shape=False,
-            element_shape=tf.TensorShape([None,input.shape[0]])
+            element_shape=tf.TensorShape([None,None])
         )
         for i in range(self.max_level):
             o = self.dwt_layers[i](input)
