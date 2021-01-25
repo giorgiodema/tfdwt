@@ -393,12 +393,16 @@ class MultivariateWaveDec(tf.keras.layers.Layer):
     def build(self,input_shape):
         self.wavedec = WaveDec(self.wavelet,self.max_level)
         self.wavedec.build((input_shape[0],input_shape[1]))
-        self.td = tf.keras.layers.TimeDistributed(self.wavedec)
     def call(self,input):
-        input = tf.transpose(input,[0,2,1])
-        input = self.td(input)
-        input = tf.transpose(input,[0,2,1])
-        return input
+        o = tf.TensorArray(
+            tf.float32,
+            size=input.shape[2]
+        )
+        for i in range(input.shape[2]):
+            o = o.write(i,self.wavedec(input[:,:,i]))
+        o = o.stack()
+        o = tf.transpose(o,perm=[1,2,0])
+        return o
     def get_max_decomposition_level(self):
         return self.wavedec.max_level
 
@@ -414,12 +418,16 @@ class MultivariateWaveRec(tf.keras.layers.Layer):
     def build(self,input_shape):
         self.waverec = WaveRec(self.wavelet,self.max_level)
         self.waverec.build((input_shape[0],input_shape[1]))
-        self.td = tf.keras.layers.TimeDistributed(self.waverec)
     def call(self,input):
-        input = tf.transpose(input,[0,2,1])
-        input = self.td(input)
-        input = tf.transpose(input,[0,2,1])
-        return input
+        o = tf.TensorArray(
+            tf.float32,
+            size=input.shape[2]
+        )
+        for i in range(input.shape[2]):
+            o = o.write(i,self.waverec(input[:,:,i]))
+        o = o.stack()
+        o = tf.transpose(o,perm=[1,2,0])
+        return o
     def get_max_decomposition_level(self):
         return self.waverec.max_level
 
