@@ -52,6 +52,31 @@ def split_coeffs(coefficients,wavelet='db4',max_level=-1):
     a = a.write(0,coefficients[:,0:coefficients.shape[1]//2,:])
     return a
 
+def mask_coeffs(coefficients,mask,wavelet='db4',max_level=-1):
+    """
+    mask the coefficient setting to zeros the coefficients of the selected bands starting from
+    the lower bands. mask is a boolean tensor which length is equal to the number of frequency bands
+    (max_level)
+    """
+    coeffs_len=coefficients.shape[1]
+    shape_len = len(coefficients.shape)
+    if shape_len==2:
+        coefficients = tf.reshape(coefficients,(coefficients.shape[0],coefficients.shape[1],1))
+    if max_level<0:
+        max_level=dwt_max_level(coeffs_len,wavelet)
+    assert(len(mask)==max_level)
+    new_coeffs = tf.Variable(initial_value=coefficients)
+    prev = 0
+    for i in range(max_level):
+        if mask[i]:
+            new_coeffs[:,prev:coeffs_len//2**(max_level-i),:].assign(tf.zeros((coefficients.shape[0],coeffs_len//2**(max_level-i)-prev,coefficients.shape[2])))
+        prev = coeffs_len//2**(max_level-i)
+    new_coeffs = tf.convert_to_tensor(new_coeffs)
+    if shape_len==2:
+        new_coeffs = tf.reshape(new_coeffs,(coefficients.shape[0],coefficients.shape[1]))
+    return new_coeffs
+
+
 def time_freq_plot(coefficients,wavelet='db4',max_level=-1,drop_low=0,drop_high=0,ax=None):
     """
     plot the time-frequency decomposition for the coefficients received as input. The input should 
@@ -113,7 +138,7 @@ def build_matrix(coeffs,signal_len,transpose=False):
     high_pass = low_pass[::-1].copy()
     high_pass[0::2] = - high_pass[0::2].copy()
 
-    m = np.zeros((signal_len,signal_len))
+    m = np.zeros((signal_len,signal_len),dtype=np.float32)
     shift = 0
 
     for i in range(0,m.shape[0],2):
