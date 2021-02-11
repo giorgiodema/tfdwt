@@ -134,9 +134,9 @@ def build_matrix(coeffs,signal_len,transpose=False):
     decomposition matrix, otherwise the reconstruction
     matrix
     """
-    low_pass = np.array(coeffs)
+    low_pass = np.array(coeffs[::-1])
     high_pass = low_pass[::-1].copy()
-    high_pass[0::2] = - high_pass[0::2].copy()
+    high_pass[1::2] = - high_pass[1::2].copy()
 
     m = np.zeros((signal_len,signal_len),dtype=np.float32)
     shift = 0
