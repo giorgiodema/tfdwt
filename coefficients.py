@@ -1,6 +1,6 @@
 # Coefficients of the Mother
 # Wavelet Functions, coefficients
-# are taken from http://wavelets.pybytes.com/wavelet
+# are taken from http://wavelets.pybytes.com/
 coeffs = {
     "haar":[0.7071067812,0.7071067812],
     "db2":[-0.1294095226,0.2241438680,0.8365163037, 0.4829629131],
