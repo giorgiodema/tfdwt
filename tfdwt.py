@@ -60,7 +60,7 @@ def mask_coeffs(coefficients,mask,wavelet='db4',max_level=-1):
     """
     mask the coefficient setting to zeros the coefficients of the selected bands starting from
     the lower bands. mask is a boolean tensor which length is equal to the number of frequency bands
-    (max_level)
+    (max_level+1)
     """
     coeffs_len=coefficients.shape[1]
     shape_len = len(coefficients.shape)
@@ -68,10 +68,10 @@ def mask_coeffs(coefficients,mask,wavelet='db4',max_level=-1):
         coefficients = tf.reshape(coefficients,(coefficients.shape[0],coefficients.shape[1],1))
     if max_level<0:
         max_level=dwt_max_level(coeffs_len,wavelet)
-    assert(len(mask)==max_level)
+    assert(len(mask)==max_level+1)
     new_coeffs = tf.Variable(initial_value=coefficients)
     prev = 0
-    for i in range(max_level):
+    for i in range(max_level+1):
         if mask[i]:
             new_coeffs[:,prev:coeffs_len//2**(max_level-i),:].assign(tf.zeros((coefficients.shape[0],coeffs_len//2**(max_level-i)-prev,coefficients.shape[2])))
         prev = coeffs_len//2**(max_level-i)
