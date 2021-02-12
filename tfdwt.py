@@ -21,7 +21,11 @@ def dwt_max_level(data_len,wavelet):
     """
     return the maximum decomposition level for the specified
     lenght of the input signal (data_len) and the specified
-    wavelet function (wavelet)
+    wavelet function (wavelet).
+    The maximum decomposition level is the maximum level where at least 
+    one coefficient in the output is uncorrupted by edge effects caused by 
+    signal extension. Put another way, decomposition stops when the 
+    signal becomes shorter than the FIR filter length for a given wavelet
     """
     return int(math.log2(data_len/(filter_len(wavelet)-1)))
 
@@ -287,13 +291,11 @@ class WaveDec(tf.keras.layers.Layer):
         self.max_level=max_level
         self.coeffs = coeffs[wavelet]
     def build(self,input_shape):
+        maxl = dwt_max_level(input_shape[1],self.wavelet)
+        if self.max_level > maxl:
+            raise ValueError("maximum decomposition level is {}, received {}".format(maxl,self.max_level))
         if self.max_level < 0:
-            self.max_level = 0
-            inp = input_shape[1]//2
-            while inp >= len(coeffs[self.wavelet]):
-                inp = inp//2
-                self.max_level+=1
-
+            self.max_level = maxl
         self.dwt_layers = []
         for i in range(self.max_level):
             self.dwt_layers.append(DWT(wavelet=self.wavelet))
@@ -344,12 +346,11 @@ class WaveRec(tf.keras.layers.Layer):
         self.max_level=max_level
         self.coeffs = coeffs[wavelet]
     def build(self,input_shape):
+        maxl = dwt_max_level(input_shape[1],self.wavelet)
+        if self.max_level > maxl:
+            raise ValueError("maximum decomposition level is {}, received {}".format(maxl,self.max_level))
         if self.max_level < 0:
-            self.max_level = 0
-            inp = input_shape[1]//2
-            while inp >= len(coeffs[self.wavelet]):
-                inp = inp//2
-                self.max_level+=1
+            self.max_level = maxl
         self.idwt_layers = []
         for i in range(self.max_level):
             self.idwt_layers.append(IDWT(wavelet=self.wavelet))
