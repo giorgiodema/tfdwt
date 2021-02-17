@@ -125,7 +125,6 @@ def interleave(t1,t2):
     of t1 and t2 interleaved along the first axis. t1 and
     t2 must have same rank
     """
-    tf.assert_equal(t1.shape,t2.shape)
     even_pos = tf.convert_to_tensor(list(range(0,2*t1.shape[0],2)),dtype=tf.int32)
     odd_pos = tf.convert_to_tensor(list(range(1,2*t1.shape[0],2)),dtype=tf.int32)
     out = tf.dynamic_stitch([even_pos,odd_pos],[t1,t2])
