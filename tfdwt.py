@@ -199,14 +199,16 @@ class MaskCoefficients(tf.keras.layers.Layer):
         super().__init__()
         self.wavelet=wavelet
         self.max_level=max_level
-        self.mask = mask
+        self.mask = tf.convert_to_tensor(mask)
         self.split_coeffs = SplitCoefficients(wavelet,max_level)
 
     def build(self,input_shape):
+        self.seqlen = input_shape[1]
         if self.max_level<0:
             self.max_level = dwt_max_level(input_shape[1],self.wavelet)
         assert(len(self.mask)==self.max_level+1)
         self.shape_len=len(input_shape)
+        self.reshape = tf.keras.layers.Reshape((input_shape[1])) if self.shape_len==2 else tf.keras.layers.Reshape((input_shape[1],input_shape[2]))
 
     def call(self,input):
         shape=tf.TensorShape([None,None,input.shape[2]]) if self.shape_len==3 else tf.TensorShape([None,None])
@@ -225,6 +227,7 @@ class MaskCoefficients(tf.keras.layers.Layer):
                 a = a.write(i,e)
         filtered = a.concat()
         filtered = tf.transpose(filtered,[1,0]) if self.shape_len==2 else tf.transpose(filtered,[1,0,2])
+        filtered = self.reshape(filtered)
         return filtered
                 
 
