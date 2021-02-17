@@ -193,9 +193,27 @@ class SplitCoefficients(tf.keras.layers.Layer):
         a = a.write(0,input[:,0:input.shape[1]//2,:]) if self.shape_len==3 else a.write(0,input[:,0:input.shape[1]//2])
         return a
 
-class HybridTreshold(tf.keras.layers.Layer):
-    def __init__(self,wavelet='db4',max_level=-1):
+def soft_treshold(x,tau):
+    cond = tf.cast(tf.math.abs(x)>tau,tf.float32)
+    h = (x/x) * (x-tau)
+    h = h*cond
+    return h
+
+def hybrid_treshold(x,tau):
+    cond = tf.cast(tf.math.abs(x)>tau,tf.float32)
+    h = x - (tf.math.square(tau)/x)
+    h = h*cond
+    return h
+
+class Treshold(tf.keras.layers.Layer):
+    def __init__(self,wavelet='db4',max_level=-1,treshold="soft"):
         super().__init__()
+        if treshold=="soft":
+            self.treshold = soft_treshold
+        elif treshold=="hybrid":
+            self.treshold= hybrid_treshold
+        else:
+            raise ValueError("treshold can be one of [soft,hybrid]")
         self.wavelet=wavelet
         self.max_level=max_level
         self.split = SplitCoefficients(wavelet,max_level)
@@ -215,7 +233,7 @@ class HybridTreshold(tf.keras.layers.Layer):
         finest = coeffs.read(coeffs.size()-1)
         std = tf.math.reduce_std(finest,axis=tf.range(1, len(finest.shape), delta=1, dtype=tf.int32, name='range'))
         tau = tf.math.sqrt(3.*tf.math.square(std))
-        finest = self.hybrid_treshold(finest,tau)
+        finest = self.treshold(finest,tau)
         finest = tf.transpose(finest,[1,0]) if self.shape_len==2 else tf.transpose(finest,[1,0,2])
         new_coeffs=new_coeffs.write(coeffs.size()-1,finest)
 
@@ -224,7 +242,7 @@ class HybridTreshold(tf.keras.layers.Layer):
         new_coeffs = new_coeffs.write(0,coarsest)
         for i in range(1,coeffs.size()-1):
             e = coeffs.read(i)
-            e = self.hybrid_treshold(e,tau)
+            e = self.treshold(e,tau)
             e = tf.transpose(e,[1,0]) if self.shape_len==2 else tf.transpose(e,[1,0,2])
             new_coeffs = new_coeffs.write(i,e)
         new_coeffs = new_coeffs.concat()
@@ -232,11 +250,7 @@ class HybridTreshold(tf.keras.layers.Layer):
         new_coeffs = self.reshape(new_coeffs)
         return new_coeffs
 
-    def hybrid_treshold(self,x,tau):
-        cond = tf.cast(tf.math.abs(x)>tau,tf.float32)
-        h = x - (tf.math.square(tau)/x)
-        h = h*cond
-        return h
+
 
 class MaskCoefficients(tf.keras.layers.Layer):
     def __init__(self,mask,wavelet='db4',max_level=-1):
