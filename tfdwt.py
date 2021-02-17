@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import math
-from coefficients import coeffs
+from tfdwt.coefficients import coeffs
 import matplotlib.pyplot as plt
 
 
@@ -193,6 +193,40 @@ class SplitCoefficients(tf.keras.layers.Layer):
         a = a.write(1,input[:,input.shape[1]//2:,:]) if self.shape_len==3 else a.write(1,input[:,input.shape[1]//2])
         a = a.write(0,input[:,0:input.shape[1]//2,:]) if self.shape_len==3 else a.write(0,input[:,0:input.shape[1]//2])
         return a
+
+class MaskCoefficients(tf.keras.layers.Layer):
+    def __init__(self,mask,wavelet='db4',max_level=-1):
+        super().__init__()
+        self.wavelet=wavelet
+        self.max_level=max_level
+        self.mask = mask
+        self.split_coeffs = SplitCoefficients(wavelet,max_level)
+
+    def build(self,input_shape):
+        if self.max_level<0:
+            self.max_level = dwt_max_level(input_shape[1],self.wavelet)
+        assert(len(self.mask)==self.max_level+1)
+        self.shape_len=len(input_shape)
+
+    def call(self,input):
+        shape=tf.TensorShape([None,None,input.shape[2]]) if self.shape_len==3 else tf.TensorShape([None,None])
+        a = tf.TensorArray(
+            tf.float32,
+            infer_shape=False,
+            element_shape=shape,
+            size=self.max_level+1)
+        s = self.split_coeffs(input)
+        for i in range(s.size()):
+            e = s.read(i)
+            e = tf.transpose(e,[1,0]) if self.shape_len==2 else tf.transpose(e,[1,0,2])
+            if self.mask[i]:
+                a = a.write(i,tf.zeros_like(e))
+            else:
+                a = a.write(i,e)
+        filtered = a.concat()
+        filtered = tf.transpose(filtered,[1,0]) if self.shape_len==2 else tf.transpose(filtered,[1,0,2])
+        return filtered
+                
 
 
 
