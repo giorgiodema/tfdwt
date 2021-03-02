@@ -193,6 +193,10 @@ class SplitCoefficients(tf.keras.layers.Layer):
         a = a.write(0,input[:,0:input.shape[1]//2,:]) if self.shape_len==3 else a.write(0,input[:,0:input.shape[1]//2])
         return a
 
+def hard_treshold(x,tau):
+    cond = tf.cast(tf.math.abs(x)>tau,tf.float32)
+    return x*cond
+
 def soft_treshold(x,tau):
     cond = tf.cast(tf.math.abs(x)>tau,tf.float32)
     h = (x/x) * (x-tau)
@@ -212,6 +216,8 @@ class Treshold(tf.keras.layers.Layer):
             self.treshold = soft_treshold
         elif treshold=="hybrid":
             self.treshold= hybrid_treshold
+        elif treshold=="hard":
+            self.treshold= hard_treshold
         else:
             raise ValueError("treshold can be one of [soft,hybrid]")
         self.wavelet=wavelet
