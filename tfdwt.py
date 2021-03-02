@@ -237,7 +237,7 @@ class Treshold(tf.keras.layers.Layer):
             infer_shape=False,
             element_shape=shape)
         finest = coeffs.read(coeffs.size()-1)
-        std = tf.math.reduce_std(finest,axis=tf.range(1, len(finest.shape), delta=1, dtype=tf.int32, name='range'))
+        std = tf.math.reduce_mean(tf.math.reduce_std(finest,axis=tf.range(1, len(finest.shape), delta=1, dtype=tf.int32, name='range')))
         tau = tf.math.sqrt(3.*tf.math.square(std))
         finest = self.treshold(finest,tau)
         finest = tf.transpose(finest,[1,0]) if self.shape_len==2 else tf.transpose(finest,[1,0,2])
